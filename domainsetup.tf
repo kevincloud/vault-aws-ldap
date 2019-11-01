@@ -1,5 +1,5 @@
 resource "aws_route53_zone" "labzone" {
-    name = "ca-lab.private"
+    name = "javaperks.local"
 
     vpc {
         vpc_id = "${data.aws_vpc.primary-vpc.id}"

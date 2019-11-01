@@ -25,3 +25,5 @@ variable "instance_size" {
 variable "vault_dl_url" {
     description = "URL to download Vault Enterprise"
 }
+
+variable "vault_license_key" { }

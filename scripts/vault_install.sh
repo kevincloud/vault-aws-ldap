@@ -92,6 +92,10 @@ echo "export VAULT_TOKEN=$VAULT_TOKEN" >> /home/ubuntu/.profile
 echo "export VAULT_ADDR=http://localhost:8200" >> /root/.profile
 echo "export VAULT_TOKEN=$VAULT_TOKEN" >> /root/.profile
 
+vault audit enable syslog
+
+vault write sys/license text=${VAULT_LICENSE}
+
 vault secrets enable -path="secret" -version=2 kv
 
 # Add our AWS secrets
@@ -112,7 +116,7 @@ slapd slapd/internal/generated_adminpw password SuperFuzz1
 slapd slapd/password2 password SuperFuzz1
 slapd slapd/unsafe_selfwrite_acl note
 slapd slapd/purge_database boolean false
-slapd slapd/domain string ca-lab.private
+slapd slapd/domain string javaperks.local
 slapd slapd/ppolicy_schema_needs_update select abort installation
 slapd slapd/invalid_config boolean true
 slapd slapd/move_old_database boolean false
@@ -128,104 +132,217 @@ cat /root/debconf-slapd.conf | debconf-set-selections
 sudo apt-get install -y slapd ldap-utils
 
 mkdir -p /root/ldap/
-# cd /etc/ldap/slapd.d/cn\=config
-# # SLAPD_PASS=$(slappasswd -s SuperFuzz1)
-# # sed -i '/^olcRootPW:/d' olcDatabase={1}hdb.ldif
-# sed -i '/^olcAccess: {2}/d' olcDatabase={1}hdb.ldif
-# sed -i '/^\s/d' olcDatabase={1}hdb.ldif
-# # echo "olcRootPW: $SLAPD_PASS" >> olcDatabase={1}hdb.ldif
-# sed -i 's/\(olcSuffix: \).*/\1dc=ca-lab,dc=private/' olcDatabase={1}hdb.ldif
-# sed -i 's/\(olcRootDN: \).*/\1cn=admin,dc=ca-lab,dc=private/' olcDatabase={1}hdb.ldif
-# sed -i 's/\(olcAccess: {0}\).*/\1to attrs=userPassword by self write by dn.base=\"cn=admin,dc=ca-lab,dc=private\" write by anonymous auth by * none/' olcDatabase={1}hdb.ldif
-# sed -i 's/\(olcAccess: {1}\).*/\1to * by dn.base=\"cn=admin,dc=ca-lab,dc=private\" write by self write by * read/' olcDatabase={1}hdb.ldif
-# echo "olcAccess: {0}to attrs=userPassword by self write by dn.base=\"cn=admin,dc=ca-lab,dc=private\" write by anonymous auth by * none" >> olcDatabase={1}hdb.ldif
-# echo "olcAccess: {1}to * by dn.base=\"cn=admin,dc=ca-lab,dc=private\" write by self write by * read" >> olcDatabase={1}hdb.ldif
-
-# # original
-# olcAccess: {0}to attrs=userPassword by self write by anonymous auth by * none
-# olcAccess: {1}to attrs=shadowLastChange by self write by * read
-# olcAccess: {2}to * by * read
 
 service slapd stop
 service slapd start
 
 sleep 3
 
-sudo bash -c "cat >/root/ldap/ca-lab.ldif" <<EOF
-dn: dc=ca-lab,dc=private
+sudo bash -c "cat >/etc/ldap/slapd.d/cn\=config/cn\=schema/cn\=\{4\}custperson.ldif" <<EOF
+# AUTO-GENERATED FILE - DO NOT EDIT!! Use ldapmodify.
+# CRC32 5e560224
+dn: cn={4}custperson
+objectClass: olcSchemaConfig
+cn: {4}custperson
+olcObjectIdentifier: {0}cidSchema 1.3.6.1.4.1.X.Y
+olcObjectIdentifier: {1}cidAttrs cidSchema:3
+olcObjectIdentifier: {2}cidOCs cidSchema:4
+olcAttributeTypes: {0}( cidAttrs:1 NAME 'customerId' DESC 'Customer ID' EQUA
+ LITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.14
+ 66.115.121.1.15{32} )
+olcObjectClasses: {0}( cidOCs:1 NAME 'customerInformation' DESC 'Additional 
+ Customer Information' SUP organizationalPerson STRUCTURAL MUST ( customerId
+  $ uid ) )
+structuralObjectClass: olcSchemaConfig
+entryUUID: 8cb57776-8b83-1039-8851-1353e7ced089
+creatorsName: cn=config
+createTimestamp: 20191025145746Z
+entryCSN: 20191025145746.517105Z#000000#000#000000
+modifiersName: cn=config
+modifyTimestamp: 20191025145746Z
+EOF
+
+service slapd restart
+
+sudo bash -c "cat >/root/ldap/javaperks.ldif" <<EOF
+dn: dc=javaperks,dc=local
 objectClass: dcObject
 objectClass: organization
-dc: ca-lab
-o : ca-lab
+dc: javaperks
+o : javaperks
 EOF
 
-sudo bash -c "cat >/root/ldap/users.ldif" <<EOF
-dn: ou=Users,dc=ca-lab,dc=private
+# add customers group
+sudo bash -c "cat >/root/ldap/customers.ldif" <<EOF
+dn: ou=Customers,dc=javaperks,dc=local
 objectClass: organizationalUnit
-ou: Users
+ou: Customers
 EOF
 
-sudo bash -c "cat >/root/ldap/jeremy.ldif" <<EOF
-dn: cn=Jeremy Cook,ou=Users,dc=ca-lab,dc=private
-cn: Jeremy Cook
-sn: Cook
-objectClass: inetOrgPerson
-userPassword: sheep
-uid: jcook
+# Add customer #1 - Janice Thompson
+sudo bash -c "cat >/root/ldap/janice_thompson.ldif" <<EOF
+dn: cn=Janice Thompson,ou=Customers,dc=javaperks,dc=local
+cn: Janice Thompson
+sn: Thompson
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: jthomp4423@example.com
+customerId: CS100312
 EOF
 
-sudo bash -c "cat >/root/ldap/logan.ldif" <<EOF
-dn: cn=Logan Rakai,ou=Users,dc=ca-lab,dc=private
-cn: Logan Rakai
-sn: Rakai
-objectClass: inetOrgPerson
-userPassword: wolf
-uid: lrakai
+# Add customer #2 - James Wilson
+sudo bash -c "cat >/root/ldap/james_wilson.ldif" <<EOF
+dn: cn=James Wilson,ou=Customers,dc=javaperks,dc=local
+cn: James Wilson
+sn: Wilson
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: wilson@example.com
+customerId: CS106004
 EOF
 
-sudo bash -c "cat >/root/ldap/engineering.ldif" <<EOF
-dn: cn=Engineering,ou=Users,dc=ca-lab,dc=private
-cn: Engineering
+# Add customer #3 - Tommy Ballinger
+sudo bash -c "cat >/root/ldap/tommy_ballinger.ldif" <<EOF
+dn: cn=Tommy Ballinger,ou=Customers,dc=javaperks,dc=local
+cn: Tommy Ballinger
+sn: Ballinger
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: tommy6677@example.com
+customerId: CS101438
+EOF
+
+# Add customer #4 - Mary McCann
+sudo bash -c "cat >/root/ldap/mary_mccann.ldif" <<EOF
+dn: cn=Mary McCann,ou=Customers,dc=javaperks,dc=local
+cn: Mary McCann
+sn: McCann
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: mmccann1212@example.com
+customerId: CS210895
+EOF
+
+# Add customer #5 - Chris Peterson
+sudo bash -c "cat >/root/ldap/chris_peterson.ldif" <<EOF
+dn: cn=Chris Peterson,ou=Customers,dc=javaperks,dc=local
+cn: Chris Peterson
+sn: Peterson
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: cjpcomp@example.com
+customerId: CS122955
+EOF
+
+# Add customer #6 - Jennifer Jones
+sudo bash -c "cat >/root/ldap/jennifer_jones.ldif" <<EOF
+dn: cn=Jennifer Jones,ou=Customers,dc=javaperks,dc=local
+cn: Jennifer Jones
+sn: Jones
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: jjhome7823@example.com
+customerId: CS602934
+EOF
+
+# Add customer #7 - Clint Mason
+sudo bash -c "cat >/root/ldap/clint_mason.ldif" <<EOF
+dn: cn=Clint Mason,ou=Customers,dc=javaperks,dc=local
+cn: Clint Mason
+sn: Mason
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: clint.mason312@example.com
+customerId: CS157843
+EOF
+
+# Add customer #8 - Matt Grey
+sudo bash -c "cat >/root/ldap/matt_grey.ldif" <<EOF
+dn: cn=Matt Grey,ou=Customers,dc=javaperks,dc=local
+cn: Matt Grey
+sn: Grey
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: greystone89@example.com
+customerId: CS523484
+EOF
+
+# Add customer #9 - Howard Turner
+sudo bash -c "cat >/root/ldap/howard_turner.ldif" <<EOF
+dn: cn=Howard Turner,ou=Customers,dc=javaperks,dc=local
+cn: Howard Turner
+sn: Turner
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: runwayyourway@example.com
+customerId: CS658871
+EOF
+
+# Add customer #10 - Larry Olsen
+sudo bash -c "cat >/root/ldap/larry_olsen.ldif" <<EOF
+dn: cn=Larry Olsen,ou=Customers,dc=javaperks,dc=local
+cn: Larry Olsen
+sn: Olsen
+objectClass: customerInformation
+userPassword: SuperSecret1
+uid: olsendog1979@example.com
+customerId: CS103393
+EOF
+
+sudo bash -c "cat >/root/ldap/StoreUser.ldif" <<EOF
+dn: cn=StoreUser,ou=Customers,dc=javaperks,dc=local
+cn: StoreUser
 objectClass: groupOfNames
-member: cn=Jeremy Cook,ou=Users,dc=ca-lab,dc=private
+member: cn=Janice Thompson,ou=Customers,dc=javaperks,dc=local
+member: cn=James Wilson,ou=Customers,dc=javaperks,dc=local
+member: cn=Tommy Ballinger,ou=Customers,dc=javaperks,dc=local
+member: cn=Mary McCann,ou=Customers,dc=javaperks,dc=local
+member: cn=Chris Peterson,ou=Customers,dc=javaperks,dc=local
+member: cn=Jennifer Jones,ou=Customers,dc=javaperks,dc=local
+member: cn=Clint Mason,ou=Customers,dc=javaperks,dc=local
+member: cn=Matt Grey,ou=Customers,dc=javaperks,dc=local
+member: cn=Howard Turner,ou=Customers,dc=javaperks,dc=local
+member: cn=Larry Olsen,ou=Customers,dc=javaperks,dc=local
 EOF
 
-sudo bash -c "cat >/root/ldap/research.ldif" <<EOF
-dn: cn=Research,ou=Users,dc=ca-lab,dc=private
-cn: Research
-objectClass: groupOfNames
-member: cn=Logan Rakai,ou=Users,dc=ca-lab,dc=private
-EOF
+ldapadd -f /root/ldap/javaperks.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/customers.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/janice_thompson.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/james_wilson.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/tommy_ballinger.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/mary_mccann.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/chris_peterson.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/jennifer_jones.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/clint_mason.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/matt_grey.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/howard_turner.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/larry_olsen.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
+ldapadd -f /root/ldap/StoreUser.ldif -D cn=admin,dc=javaperks,dc=local -w SuperFuzz1
 
-ldapadd -f /root/ldap/ca-lab.ldif -D cn=admin,dc=ca-lab,dc=private -w SuperFuzz1
-ldapadd -f /root/ldap/users.ldif -D cn=admin,dc=ca-lab,dc=private -w SuperFuzz1
-ldapadd -f /root/ldap/jeremy.ldif -D cn=admin,dc=ca-lab,dc=private -w SuperFuzz1
-ldapadd -f /root/ldap/logan.ldif -D cn=admin,dc=ca-lab,dc=private -w SuperFuzz1
-ldapadd -f /root/ldap/engineering.ldif -D cn=admin,dc=ca-lab,dc=private -w SuperFuzz1
-ldapadd -f /root/ldap/research.ldif -D cn=admin,dc=ca-lab,dc=private -w SuperFuzz1
-
-sudo bash -c "cat >/root/ldap/Engineering.hcl" <<EOF
-path "secret/data/Engineering" {
+sudo bash -c "cat >/root/ldap/StoreUsers.hcl" <<EOF
+path "secret/data/StoreUsers" {
     capabilities = ["create", "read", "update", "delete", "list"]
 }
 EOF
 
 sudo bash -c "cat >/root/1_create_policy.sh" <<EOF
-vault policy write engineering /root/ldap/Engineering.hcl
+vault policy write engineering /root/ldap/StoreUsers.hcl
 EOF
 
 chmod +x /root/1_create_policy.sh
 
-sudo bash -c "cat >/root/2_enable_ldap_auth.sh" <<EOF
+sudo bash -c "cat >/root/2_enable_ldap_auth.sh" << 'EOF'
 vault auth enable ldap
 
 vault write auth/ldap/config \
-    url="ldap://ldap.ca-lab.private" \
-    userattr="cn" \
-    userdn="ou=Users,dc=ca-lab,dc=private" \
-    groupdn="ou=Users,dc=ca-lab,dc=private" \
+    url="ldap://ldap.javaperks.local" \
+    userattr="uid" \
+    userdn="ou=Customers,dc=javaperks,dc=local" \
+    groupdn="ou=Customers,dc=javaperks,dc=local" \
     groupfilter="(&(objectClass=groupOfNames)(member={{.UserDN}}))" \
     groupattr="cn"
+    binddn="cn=admin,dc=javaperks,dc=local" \
+    bindpass="SuperFuzz1"
 EOF
 
 chmod +x /root/2_enable_ldap_auth.sh
@@ -253,15 +370,3 @@ EOF
 chmod +x /root/4_validate.sh
 
 echo "LDAP installation complete."
-
-# dn: cn=Jeremy Cook,ou=Users,dc=ca-lab,dc=private
-# cn: Jeremy Cook
-# sn: Cook
-# objectClass: inetOrgPerson
-# userPassword: sheep
-# uid: jcook
-
-# dn: cn=Engineering,ou=Users,dc=ca-lab,dc=private
-# cn: Engineering
-# objectClass: groupOfNames
-# member: cn=Jeremy Cook,ou=Users,dc=ca-lab,dc=private
